@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS tbl_ispluka_audit_logs (
     KEY idx_ispluka_audit_user (legacy_user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Seed only global/system permissions. These are additive and idempotent.
+-- Seed global/system permissions. Idempotent.
 INSERT IGNORE INTO tbl_ispluka_permissions (permission_key, display_name, description) VALUES
 ('platform.tenants.manage', 'Manage tenants', 'Create, update, suspend and manage ISP tenants'),
 ('platform.subscriptions.manage', 'Manage subscriptions', 'Manage SaaS subscriptions and limits'),
@@ -137,10 +137,24 @@ INSERT IGNORE INTO tbl_ispluka_permissions (permission_key, display_name, descri
 ('resellers.manage', 'Manage resellers', 'Manage tenant reseller access'),
 ('settings.manage', 'Manage settings', 'Manage tenant settings');
 
--- Seed system roles. tenant_id NULL means platform/system role template.
+-- Seed system role templates. tenant_id NULL means platform/system template.
 INSERT IGNORE INTO tbl_ispluka_roles (tenant_id, name, display_name, description, is_system) VALUES
 (NULL, 'master_admin', 'Master Admin', 'Platform owner and SaaS administrator', 1),
 (NULL, 'admin', 'Admin', 'ISP tenant administrator', 1),
 (NULL, 'reseller', 'Reseller', 'ISP reseller', 1),
 (NULL, 'employee', 'Employee', 'Tenant employee with scoped permissions', 1),
 (NULL, 'customer', 'Customer', 'Customer self-service role', 1);
+
+-- Default system-role permissions. Also idempotent.
+INSERT IGNORE INTO tbl_ispluka_role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM tbl_ispluka_roles r
+JOIN tbl_ispluka_permissions p
+WHERE r.tenant_id IS NULL
+  AND (
+      (r.name = 'master_admin')
+      OR (r.name = 'admin' AND p.permission_key NOT LIKE 'platform.%')
+      OR (r.name = 'reseller' AND p.permission_key IN ('customers.view','billing.view','routers.view','reports.view'))
+      OR (r.name = 'employee' AND p.permission_key IN ('customers.view','billing.view','routers.view','reports.view','network.provision'))
+      OR (r.name = 'customer' AND p.permission_key = 'billing.view')
+  );
