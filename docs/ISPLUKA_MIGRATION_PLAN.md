@@ -6,16 +6,47 @@ Evolve the current PHPNuxBill-based Nux codebase into the Ispluka ISP Billing & 
 
 The target is a production-ready, multi-tenant ISP SaaS platform rather than a simple single-tenant billing application.
 
+## Critical Compatibility Rule — Existing MySQL Must Keep Working
+
+**The current production MySQL database connection must remain unchanged during the migration.**
+
+This means:
+
+- Do not change the existing MySQL database host, port, database name, username or password.
+- Do not require the user to create a new MySQL user or change the current database password.
+- Do not replace the existing MySQL configuration with PostgreSQL.
+- Do not perform an automatic MySQL-to-PostgreSQL cutover.
+- Do not rename/drop existing tables or columns that current Nux functions depend on without a backward-compatible migration and rollback plan.
+- Existing login, customers, packages, invoices, payments, vouchers, PPPoE, Hotspot, FreeRADIUS, MikroTik, notifications, plugins and cron workflows must continue to work.
+- New Ispluka functionality must be introduced additively and feature-by-feature.
+- Database migrations must be optional, explicit, reversible where practical, and safe for an existing installation.
+- Existing `config.php` credentials remain the source of truth for the legacy MySQL application until a later, separately tested migration path is approved.
+
+### Database Strategy
+
+The implementation will use a **MySQL-first compatibility architecture** initially:
+
+1. Keep the existing Nux MySQL connection and ORM behavior intact.
+2. Audit the current schema before adding any tenant/RBAC tables.
+3. Add new Ispluka tables without modifying existing billing tables unless necessary.
+4. Where existing records need tenant ownership, introduce compatibility-safe mapping rather than forcing immediate destructive schema changes.
+5. Keep legacy pages and cron jobs operational throughout the transition.
+6. Introduce service/repository boundaries around database access so a future PostgreSQL adapter can be added without breaking MySQL.
+7. Only after the MySQL implementation is stable and fully tested should PostgreSQL become an optional migration target.
+
+The PostgreSQL target remains an architectural direction for the future modern SaaS layer; it is **not a prerequisite for the current installation**.
+
 ## Guiding Strategy
 
 1. Preserve existing working ISP domain logic first.
-2. Add tenant isolation before exposing SaaS functionality.
-3. Introduce a clean application/service boundary around existing modules.
-4. Add role-based access control for Master Admin, Admin, Reseller, Employee and Customer.
-5. Add network automation and reconciliation as first-class services.
-6. Add payment/webhook abstractions so gateways are replaceable.
-7. Add background jobs, observability and API contracts before high-scale features.
-8. Migrate UI incrementally; do not break the existing billing workflow during the transition.
+2. Preserve the existing MySQL credentials and connection path.
+3. Add tenant isolation before exposing SaaS functionality.
+4. Introduce a clean application/service boundary around existing modules.
+5. Add role-based access control for Master Admin, Admin, Reseller, Employee and Customer.
+6. Add network automation and reconciliation as first-class services.
+7. Add payment/webhook abstractions so gateways are replaceable.
+8. Add background jobs, observability and API contracts before high-scale features.
+9. Migrate UI incrementally; do not break the existing billing workflow during the transition.
 
 ## Target Roles
 
@@ -34,6 +65,7 @@ The target is a production-ready, multi-tenant ISP SaaS platform rather than a s
 - Tenant-aware authentication and authorization.
 - Tenant status, limits and subscription state.
 - Platform-level audit trail.
+- Initial tenant mapping must not invalidate existing single-tenant installations.
 
 ### 2. SaaS Subscription
 
@@ -49,6 +81,7 @@ The target is a production-ready, multi-tenant ISP SaaS platform rather than a s
 - Permission-based authorization rather than role-name checks scattered through pages.
 - Session/JWT boundary designed for future API clients.
 - Refresh-token rotation when the modern API layer is introduced.
+- Existing session/login behavior must remain available until the replacement is proven stable.
 
 ### 4. ISP Billing
 
@@ -77,6 +110,7 @@ Retain and improve existing capabilities where available:
 - Reconciliation between billing state and router state.
 - Live traffic/bandwidth monitoring.
 - Operation logs and retry-safe commands.
+- Existing MikroTik behavior must not be disabled while the new service layer is introduced.
 
 ### 6. Payments
 
@@ -90,6 +124,7 @@ Gateway abstraction with webhook-first reconciliation:
 - Callback/webhook validation.
 - Idempotent payment processing.
 - Automatic invoice/payment reconciliation.
+- Existing payment gateway configuration must remain usable during migration.
 
 ### 7. Notifications
 
@@ -120,6 +155,8 @@ Target architecture:
 - Versioned API endpoints.
 - Idempotency for external callbacks and critical mutations.
 
+The API layer will initially operate alongside the existing PHP application; it will not require replacing the current MySQL-backed pages.
+
 ### 10. Background Processing
 
 Target infrastructure:
@@ -132,6 +169,8 @@ Target infrastructure:
 - Payment reconciliation jobs.
 - Retry/dead-letter handling.
 
+Existing cron jobs remain operational until their replacements are verified.
+
 ### 11. Modern Frontend
 
 Target frontend direction:
@@ -143,20 +182,25 @@ Target frontend direction:
 - PWA support.
 - Separate dashboards for platform, ISP admin, reseller, employee and customer.
 
+The modern frontend will consume new APIs and coexist with the current UI during migration.
+
 ## Data Architecture Direction
 
-Current Nux storage is MySQL-oriented. The Ispluka target is PostgreSQL for the modern SaaS architecture.
+Current Nux storage is MySQL-oriented. The Ispluka long-term target is PostgreSQL for the modern SaaS architecture.
 
-The migration must therefore be incremental. Existing production billing data should not be discarded or rewritten blindly.
+**Current implementation target: MySQL compatibility first.** Existing production billing data should not be discarded, rewritten blindly, or moved automatically.
 
 Recommended sequence:
 
 1. Inventory current tables and relationships.
-2. Mark tables as reusable, tenant-scoped, replaceable or legacy.
-3. Define canonical Ispluka entities.
-4. Add tenant identifiers and constraints where safe.
-5. Build migration/import tooling.
-6. Validate billing totals and network credentials before cutover.
+2. Verify the live configuration and connection assumptions.
+3. Mark tables as reusable, tenant-scoped, replaceable or legacy.
+4. Define canonical Ispluka entities.
+5. Add new compatibility-safe tables first.
+6. Add tenant identifiers/mappings only where safe.
+7. Build migration/import tooling before any cross-database move.
+8. Validate billing totals and network credentials before any cutover.
+9. Keep PostgreSQL as a separately tested future adapter/target.
 
 ## Reuse / Modify / New Rule
 
@@ -169,6 +213,7 @@ Recommended sequence:
 - MikroTik integration primitives.
 - FreeRADIUS integration.
 - Existing notification/payment plugin concepts.
+- Existing MySQL configuration and connection.
 
 ### Modify/refactor
 
@@ -192,7 +237,7 @@ Recommended sequence:
 - API gateway/service layer.
 - WebSocket event layer.
 - Redis queue architecture.
-- PostgreSQL target schema.
+- PostgreSQL adapter/target schema as a later phase.
 - Live bandwidth dashboard.
 - MikroTik reconciliation engine.
 - BTRC reporting.
@@ -204,15 +249,18 @@ Recommended sequence:
 
 - Document current schema and application boundaries.
 - Identify authentication, customer, package, router, payment and cron entry points.
+- Verify the existing MySQL configuration path.
 - Define tenant model and RBAC model.
 - Add architecture documentation and migration rules.
+- No production credential change.
 
 ### Milestone 2 — Tenant-safe Core
 
-- Introduce tenant-aware data access.
+- Introduce tenant-aware data access without breaking legacy tables.
 - Add role/permission model.
 - Add audit logging.
 - Add platform/admin separation.
+- Preserve existing login and billing paths until the new path is verified.
 
 ### Milestone 3 — Network Reliability
 
@@ -235,8 +283,18 @@ Recommended sequence:
 - WebSocket live status.
 - PWA.
 
+### Milestone 6 — Optional PostgreSQL Migration
+
+- Only after MySQL compatibility is proven.
+- Export/transform data with validation.
+- Run dual-read/validation where practical.
+- Test rollback before cutover.
+- Keep the original MySQL database intact until the new system is accepted.
+
 ## Non-Negotiable Engineering Rules
 
+- **Never require changing the existing MySQL username or password.**
+- **Never replace the current MySQL connection merely to introduce Ispluka features.**
 - Never trust a tenant ID supplied by the browser without server-side authorization.
 - Every tenant-owned query must be tenant-scoped.
 - Payment callbacks must be authenticated/verified and idempotent.
@@ -246,3 +304,4 @@ Recommended sequence:
 - Existing working billing behavior must be covered by tests before major refactoring.
 - Do not mix platform-level and tenant-level permissions.
 - Do not claim a feature is complete until the complete workflow is tested end-to-end.
+- No production cutover without backup, validation and rollback procedure.
