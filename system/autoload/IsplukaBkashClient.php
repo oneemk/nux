@@ -2,9 +2,9 @@
 /**
  * Minimal bKash HTTP client for Ispluka.
  *
- * The client is intentionally configuration-driven: base URL and credentials
- * are supplied at runtime and are never stored in source control. It does not
- * write Ispluka or legacy billing data.
+ * The client is configuration-driven: base URL and credentials are supplied at
+ * runtime and are never stored in source control. It does not write Ispluka or
+ * legacy billing data.
  */
 class IsplukaBkashClient
 {
@@ -26,21 +26,21 @@ class IsplukaBkashClient
 
     public function grantToken()
     {
+        // bKash requires app_key/app_secret in the JSON body and merchant
+        // username/password as HTTP headers for the token grant request.
         return $this->request('POST', '/tokenized/checkout/token/grant', [
+            'app_key' => (string) $this->config['app_key'],
+            'app_secret' => (string) $this->config['app_secret'],
+        ], [
             'username' => (string) $this->config['username'],
             'password' => (string) $this->config['password'],
-        ], [
-            'Authorization' => 'Basic ' . base64_encode(
-                (string) $this->config['username'] . ':' . (string) $this->config['password']
-            ),
-            'X-App-Key' => (string) $this->config['app_key'],
         ]);
     }
 
     public function createPayment($token, array $payload)
     {
         return $this->request('POST', '/tokenized/checkout/create', $payload, [
-            'Authorization' => 'Bearer ' . trim((string) $token),
+            'Authorization' => trim((string) $token),
             'X-App-Key' => (string) $this->config['app_key'],
         ]);
     }
@@ -55,7 +55,7 @@ class IsplukaBkashClient
         return $this->request('POST', '/tokenized/checkout/execute', [
             'paymentID' => $paymentId,
         ], [
-            'Authorization' => 'Bearer ' . trim((string) $token),
+            'Authorization' => trim((string) $token),
             'X-App-Key' => (string) $this->config['app_key'],
         ]);
     }
@@ -70,7 +70,7 @@ class IsplukaBkashClient
         return $this->request('POST', '/tokenized/checkout/payment/status', [
             'paymentID' => $paymentId,
         ], [
-            'Authorization' => 'Bearer ' . trim((string) $token),
+            'Authorization' => trim((string) $token),
             'X-App-Key' => (string) $this->config['app_key'],
         ]);
     }
@@ -107,6 +107,8 @@ class IsplukaBkashClient
             CURLOPT_HTTPHEADER => $headerLines,
             CURLOPT_CONNECTTIMEOUT => min(10, $this->config['timeout']),
             CURLOPT_TIMEOUT => $this->config['timeout'],
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
             CURLOPT_SSL_VERIFYPEER => $this->config['verify_tls'],
             CURLOPT_SSL_VERIFYHOST => $this->config['verify_tls'] ? 2 : 0,
         ]);
@@ -127,6 +129,9 @@ class IsplukaBkashClient
 
         if ($httpCode < 200 || $httpCode >= 300) {
             $message = isset($decoded['statusMessage']) ? (string) $decoded['statusMessage'] : 'bKash API request failed.';
+            if (isset($decoded['errorMessage']) && trim((string) $decoded['errorMessage']) !== '') {
+                $message = (string) $decoded['errorMessage'];
+            }
             throw new RuntimeException($message . ' (HTTP ' . $httpCode . ')');
         }
 
