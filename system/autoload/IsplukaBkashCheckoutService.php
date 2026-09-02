@@ -18,13 +18,14 @@ class IsplukaBkashCheckoutService
      * Create a bKash payment after obtaining a runtime grant token.
      * The returned response is the provider response and is not persisted.
      */
-    public function create($intentId, $callbackUrl, $payerReference = '')
+    public function create($intentId, $callbackUrl, $payerReference = '', $legacyUserId = 0)
     {
         $token = $this->grantTokenValue();
         $payload = $this->paymentService->buildCreatePayload(
             $intentId,
             $callbackUrl,
-            $payerReference
+            $payerReference,
+            $legacyUserId
         );
 
         $response = $this->paymentService->createPayment($token, $payload);
@@ -65,6 +66,11 @@ class IsplukaBkashCheckoutService
         $token = $this->paymentService->getClient()->grantToken();
         if (!is_array($token)) {
             throw new RuntimeException('bKash token response is invalid.');
+        }
+
+        $statusCode = trim((string) ($token['statusCode'] ?? ''));
+        if ($statusCode !== '' && $statusCode !== '0000') {
+            throw new RuntimeException((string) ($token['statusMessage'] ?? 'bKash token grant failed.'));
         }
 
         $tokenValue = trim((string) ($token['id_token'] ?? $token['idToken'] ?? ''));
