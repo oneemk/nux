@@ -18,7 +18,21 @@ $db_user    = "root"; # Database Username
 $db_pass    = ""; # Database Password
 $db_name    = "phpnuxbill"; # Database Name
 
-
+/*
+ * Optional Ispluka bKash runtime configuration.
+ *
+ * Keep real credentials out of Git. Environment variables with the same
+ * ISPLUKA_BKASH_* names are preferred. Alternatively define these keys in the
+ * real config.php (never commit that file with secrets).
+ *
+ * $config['ispluka_bkash_base_url'] = 'https://...';
+ * $config['ispluka_bkash_app_key'] = '...';
+ * $config['ispluka_bkash_app_secret'] = '...';
+ * $config['ispluka_bkash_username'] = '...';
+ * $config['ispluka_bkash_password'] = '...';
+ * $config['ispluka_bkash_timeout'] = 20;
+ * $config['ispluka_bkash_verify_tls'] = true;
+ */
 
 
 //error reporting
