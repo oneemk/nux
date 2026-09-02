@@ -68,11 +68,12 @@ class IsplukaGatewayCallbackProcessor
         }
         $wasAlreadyInStatus = strtolower((string) $previous->status) === $status;
 
+        // setStatus signature is (intentId, status, gatewayTrxId, legacyUserId).
         $intent = IsplukaPaymentService::setStatus(
             $intentId,
             $status,
-            $legacyUserId,
-            $trxId
+            $trxId,
+            $legacyUserId
         );
 
         return [
