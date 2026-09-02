@@ -24,15 +24,19 @@ class IsplukaBkashPaymentService
      * Build a bKash create-payment request from an existing Ispluka intent.
      * No network request is made by this method.
      */
-    public function buildCreatePayload($intentId, $callbackUrl, $payerReference = '')
+    public function buildCreatePayload($intentId, $callbackUrl, $payerReference = '', $legacyUserId = 0)
     {
-        $intent = IsplukaPaymentService::find($intentId);
+        $intent = IsplukaPaymentService::find($intentId, $legacyUserId);
         if (!$intent) {
             throw new RuntimeException('Payment intent not found for the active tenant.');
         }
 
         if (strtolower((string) $intent->provider) !== 'bkash') {
             throw new RuntimeException('Payment intent provider is not bKash.');
+        }
+
+        if (strtolower((string) $intent->status) !== 'pending') {
+            throw new RuntimeException('Only pending payment intents can start a bKash checkout.');
         }
 
         $callbackUrl = trim((string) $callbackUrl);
@@ -52,7 +56,7 @@ class IsplukaBkashPaymentService
             'callbackURL' => $callbackUrl,
             'amount' => number_format((float) $intent->amount, 2, '.', ''),
             'currency' => (string) $intent->currency,
-            'intentId' => (string) $intent->id,
+            'intent' => 'sale',
             'merchantInvoiceNumber' => $invoice,
         ];
     }
