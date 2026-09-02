@@ -101,7 +101,7 @@ try {
             showResult(false, 'A valid intent_id is required.');
         }
 
-        $callbackUrl = rtrim((string) APP_URL, '/') . '/system/api.php?r=isplukaBkash%26action=callback';
+        $callbackUrl = rtrim((string) APP_URL, '/') . '/system/api.php?r=isplukaBkash&action=callback';
         $payerReference = _post('payer_reference', '');
         $service = new IsplukaBkashCheckoutService(
             new IsplukaBkashPaymentService(ispluka_bkash_client())
