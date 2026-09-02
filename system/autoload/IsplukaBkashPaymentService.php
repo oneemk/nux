@@ -15,6 +15,11 @@ class IsplukaBkashPaymentService
         $this->client = $client;
     }
 
+    public function getClient()
+    {
+        return $this->client;
+    }
+
     /**
      * Build a bKash create-payment request from an existing Ispluka intent.
      * No network request is made by this method.
