@@ -2,8 +2,8 @@
 /**
  * Provider-neutral payment gateway callback boundary.
  *
- * Provider-specific adapters must verify the gateway response/signature and
- * normalize it to intent_id, transaction_id, amount and provider before this
+ * Provider-specific adapters must verify the provider response/signature and
+ * normalize it to intent_id, gateway_trx_id, amount and provider before this
  * service is called. This class performs no legacy billing writes.
  */
 class IsplukaGatewayCallbackService
@@ -24,6 +24,7 @@ class IsplukaGatewayCallbackService
             throw new RuntimeException('Gateway provider does not match the payment intent provider.');
         }
 
+        $wasAlreadyPaid = strtolower((string) $intent->status) === 'paid';
         $completed = IsplukaPaymentService::markPaid(
             $intentId,
             $gatewayTrxId,
@@ -33,7 +34,7 @@ class IsplukaGatewayCallbackService
 
         return [
             'intent' => $completed,
-            'idempotent' => strtolower((string) $intent->status) === 'paid',
+            'idempotent' => $wasAlreadyPaid,
             'legacy_settlement' => 'NOT_PERFORMED',
         ];
     }
