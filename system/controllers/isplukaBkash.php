@@ -106,7 +106,7 @@ try {
         $service = new IsplukaBkashCheckoutService(
             new IsplukaBkashPaymentService(ispluka_bkash_client())
         );
-        $result = $service->create($intentId, $callbackUrl, $payerReference);
+        $result = $service->create($intentId, $callbackUrl, $payerReference, $legacyUserId);
 
         showResult(true, 'bKash payment created.', $result, [
             'action' => 'create',
