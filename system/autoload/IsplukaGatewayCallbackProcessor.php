@@ -60,6 +60,14 @@ class IsplukaGatewayCallbackProcessor
             throw new RuntimeException('Unsupported canonical gateway status.');
         }
 
+        // Capture the previous state so the idempotent flag means "already in
+        // this state before processing", rather than always becoming true.
+        $previous = IsplukaPaymentService::find($intentId, $legacyUserId);
+        if (!$previous) {
+            throw new RuntimeException('Payment intent not found for the active tenant.');
+        }
+        $wasAlreadyInStatus = strtolower((string) $previous->status) === $status;
+
         $intent = IsplukaPaymentService::setStatus(
             $intentId,
             $status,
@@ -69,7 +77,7 @@ class IsplukaGatewayCallbackProcessor
 
         return [
             'intent' => $intent,
-            'idempotent' => strtolower((string) $intent->status) === $status,
+            'idempotent' => $wasAlreadyInStatus,
             'legacy_settlement' => 'NOT_PERFORMED',
         ];
     }
