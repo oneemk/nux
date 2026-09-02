@@ -18,16 +18,16 @@ class IsplukaBkashCheckoutService
      * Create a bKash payment after obtaining a runtime grant token.
      * The returned response is the provider response and is not persisted.
      */
-    public function create($intentId, $callbackUrl, array $config, $payerReference = '')
+    public function create($intentId, $callbackUrl, $payerReference = '')
     {
-        $token = $this->paymentService->getClient()->grantToken();
+        $token = $this->grantTokenValue();
         $payload = $this->paymentService->buildCreatePayload(
             $intentId,
             $callbackUrl,
             $payerReference
         );
 
-        $response = $this->paymentService->createPayment($token['id_token'] ?? $token['idToken'] ?? '', $payload);
+        $response = $this->paymentService->createPayment($token, $payload);
         if (!is_array($response)) {
             throw new RuntimeException('bKash create-payment returned an invalid response.');
         }
@@ -41,28 +41,37 @@ class IsplukaBkashCheckoutService
     /**
      * Execute an existing bKash payment using a freshly obtained token.
      */
-    public function execute($paymentId, array $config)
+    public function execute($paymentId)
     {
-        $token = $this->paymentService->getClient()->grantToken();
-        $tokenValue = $token['id_token'] ?? $token['idToken'] ?? '';
-        if ($tokenValue === '') {
-            throw new RuntimeException('bKash token response did not contain an id token.');
-        }
-
-        return $this->paymentService->executePayment($tokenValue, $paymentId);
+        return $this->paymentService->executePayment(
+            $this->grantTokenValue(),
+            $paymentId
+        );
     }
 
     /**
      * Query an existing bKash payment using a freshly obtained token.
      */
-    public function query($paymentId, array $config)
+    public function query($paymentId)
+    {
+        return $this->paymentService->queryPayment(
+            $this->grantTokenValue(),
+            $paymentId
+        );
+    }
+
+    private function grantTokenValue()
     {
         $token = $this->paymentService->getClient()->grantToken();
-        $tokenValue = $token['id_token'] ?? $token['idToken'] ?? '';
+        if (!is_array($token)) {
+            throw new RuntimeException('bKash token response is invalid.');
+        }
+
+        $tokenValue = trim((string) ($token['id_token'] ?? $token['idToken'] ?? ''));
         if ($tokenValue === '') {
             throw new RuntimeException('bKash token response did not contain an id token.');
         }
 
-        return $this->paymentService->queryPayment($tokenValue, $paymentId);
+        return $tokenValue;
     }
 }
